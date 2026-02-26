@@ -30,7 +30,11 @@ const ConfigPage = () => {
   const [simMax, setSimMax] = useState("100");
   const [simInterval, setSimInterval] = useState("3");
   const [simRunning, setSimRunning] = useState(false);
+  const [simDuration, setSimDuration] = useState("30");
+  const [simRemaining, setSimRemaining] = useState(0);
   const simTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const simCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleConnect = () => {
     if (!apiKey || !dbUrl) return;
@@ -98,24 +102,41 @@ const ConfigPage = () => {
     }
   };
 
+  const stopSimulation = () => {
+    if (simTimerRef.current) clearInterval(simTimerRef.current);
+    if (simStopRef.current) clearTimeout(simStopRef.current);
+    if (simCountdownRef.current) clearInterval(simCountdownRef.current);
+    simTimerRef.current = null;
+    simStopRef.current = null;
+    simCountdownRef.current = null;
+    setSimRunning(false);
+    setSimRemaining(0);
+    addLog("Simulation stopped");
+  };
+
   const handleToggleSimulation = () => {
     if (simRunning) {
-      if (simTimerRef.current) clearInterval(simTimerRef.current);
-      simTimerRef.current = null;
-      setSimRunning(false);
-      addLog("Simulation stopped");
+      stopSimulation();
     } else {
       pushSimData();
-      const ms = Math.max(1, parseFloat(simInterval) || 3) * 1000;
-      simTimerRef.current = setInterval(pushSimData, ms);
+      const intervalMs = Math.max(1, parseFloat(simInterval) || 3) * 1000;
+      const durationMs = Math.max(1, parseFloat(simDuration) || 30) * 1000;
+      simTimerRef.current = setInterval(pushSimData, intervalMs);
+      setSimRemaining(Math.ceil(durationMs / 1000));
+      simCountdownRef.current = setInterval(() => {
+        setSimRemaining((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      simStopRef.current = setTimeout(stopSimulation, durationMs);
       setSimRunning(true);
-      addLog(`Simulation started (interval: ${ms / 1000}s)`);
+      addLog(`Simulation started (interval: ${intervalMs / 1000}s, duration: ${durationMs / 1000}s)`);
     }
   };
 
   useEffect(() => {
     return () => {
       if (simTimerRef.current) clearInterval(simTimerRef.current);
+      if (simStopRef.current) clearTimeout(simStopRef.current);
+      if (simCountdownRef.current) clearInterval(simCountdownRef.current);
     };
   }, []);
 
@@ -212,7 +233,7 @@ const ConfigPage = () => {
           {/* Simulator */}
           <div className="glass-card p-5 space-y-4">
             <h3 className="font-bold text-foreground">Global Simulator</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Min</label>
                 <Input value={simMin} onChange={(e) => setSimMin(e.target.value)} className="bg-secondary" disabled={simRunning} />
@@ -221,15 +242,24 @@ const ConfigPage = () => {
                 <label className="text-xs text-muted-foreground">Max</label>
                 <Input value={simMax} onChange={(e) => setSimMax(e.target.value)} className="bg-secondary" disabled={simRunning} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Interval (s)</label>
                 <Input value={simInterval} onChange={(e) => setSimInterval(e.target.value)} className="bg-secondary" disabled={simRunning} />
               </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Durasi (s)</label>
+                <Input value={simDuration} onChange={(e) => setSimDuration(e.target.value)} className="bg-secondary" disabled={simRunning} />
+              </div>
             </div>
             {simRunning && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                Mengirim data setiap {simInterval}s...
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  Mengirim setiap {simInterval}s
+                </div>
+                <span className="font-mono font-medium text-foreground">{simRemaining}s tersisa</span>
               </div>
             )}
             <Button
