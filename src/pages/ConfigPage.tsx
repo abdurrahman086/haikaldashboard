@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useFirebase } from "@/contexts/FirebaseContext";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,9 @@ const ConfigPage = () => {
   // Simulator
   const [simMin, setSimMin] = useState("0");
   const [simMax, setSimMax] = useState("100");
+  const [simInterval, setSimInterval] = useState("3");
+  const [simRunning, setSimRunning] = useState(false);
+  const simTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleConnect = () => {
     if (!apiKey || !dbUrl) return;
@@ -56,7 +59,7 @@ const ConfigPage = () => {
     }
   };
 
-  const handleSimulate = () => {
+  const pushSimData = () => {
     if (!isConfigured || !config) return;
     try {
       const apps = getApps();
@@ -89,11 +92,32 @@ const ConfigPage = () => {
       };
 
       set(ref(db, basePath), dummyData);
-      addLog("Simulation data pushed successfully");
+      addLog("Simulation data pushed");
     } catch (err: any) {
       addLog(`Simulation error: ${err.message}`);
     }
   };
+
+  const handleToggleSimulation = () => {
+    if (simRunning) {
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+      simTimerRef.current = null;
+      setSimRunning(false);
+      addLog("Simulation stopped");
+    } else {
+      pushSimData();
+      const ms = Math.max(1, parseFloat(simInterval) || 3) * 1000;
+      simTimerRef.current = setInterval(pushSimData, ms);
+      setSimRunning(true);
+      addLog(`Simulation started (interval: ${ms / 1000}s)`);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen pb-28">
@@ -188,23 +212,32 @@ const ConfigPage = () => {
           {/* Simulator */}
           <div className="glass-card p-5 space-y-4">
             <h3 className="font-bold text-foreground">Global Simulator</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Min</label>
-                <Input value={simMin} onChange={(e) => setSimMin(e.target.value)} className="bg-secondary" />
+                <Input value={simMin} onChange={(e) => setSimMin(e.target.value)} className="bg-secondary" disabled={simRunning} />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Max</label>
-                <Input value={simMax} onChange={(e) => setSimMax(e.target.value)} className="bg-secondary" />
+                <Input value={simMax} onChange={(e) => setSimMax(e.target.value)} className="bg-secondary" disabled={simRunning} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Interval (s)</label>
+                <Input value={simInterval} onChange={(e) => setSimInterval(e.target.value)} className="bg-secondary" disabled={simRunning} />
               </div>
             </div>
-            <div className="h-3 w-full rounded-full bg-secondary" />
+            {simRunning && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                Mengirim data setiap {simInterval}s...
+              </div>
+            )}
             <Button
-              onClick={handleSimulate}
+              onClick={handleToggleSimulation}
               disabled={!isConfigured}
-              className="w-full bg-foreground text-background hover:bg-foreground/90"
+              className={`w-full ${simRunning ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "bg-foreground text-background hover:bg-foreground/90"}`}
             >
-              Start Simulation
+              {simRunning ? "Stop Simulation" : "Start Simulation"}
             </Button>
           </div>
         </div>
