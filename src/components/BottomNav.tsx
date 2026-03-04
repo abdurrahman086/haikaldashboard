@@ -1,29 +1,30 @@
-import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutGrid, Home, Cloud, Power, BarChart3, HelpCircle } from "lucide-react";
+import type { TabKey } from "@/App";
 
-const navItems = [
-  { icon: LayoutGrid, path: "/", label: "Dashboard" },
-  { icon: Home, path: "/", label: "Home" },
-  { icon: Cloud, path: "/config", label: "Config" },
-  { icon: Power, path: "/devices", label: "Devices" },
-  { icon: BarChart3, path: "/telemetry", label: "Telemetry" },
-  { icon: HelpCircle, path: "/help", label: "Help" },
+const navItems: { icon: typeof LayoutGrid; tab: TabKey; label: string }[] = [
+  { icon: LayoutGrid, tab: "dashboard", label: "Dashboard" },
+  { icon: Cloud, tab: "config", label: "Config" },
+  { icon: Power, tab: "devices", label: "Devices" },
+  { icon: BarChart3, tab: "telemetry", label: "Telemetry" },
+  { icon: HelpCircle, tab: "help", label: "Help" },
 ];
 
-const BottomNav = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
+interface BottomNavProps {
+  activeTab: TabKey;
+  onTabChange: (tab: TabKey) => void;
+}
 
+const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
   return (
     <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
       <div className="flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 shadow-lg">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active = location.pathname === item.path;
+          const active = activeTab === item.tab;
           return (
             <button
               key={item.label}
-              onClick={() => navigate(item.path)}
+              onClick={() => onTabChange(item.tab)}
               className={`rounded-full p-3 transition-colors ${
                 active
                   ? "text-foreground"

@@ -7,7 +7,7 @@ interface DeviceCardProps {
   name: string;
   type: "switch" | "dimmer" | "sensor";
   value: number;
-  upperLimit?: number;
+  upper_limit?: number;
   unit?: string;
 }
 
@@ -33,15 +33,17 @@ const SwitchCard = ({ name, value }: { name: string; value: number }) => {
 const DimmerCard = ({
   name,
   value,
-  upperLimit = 1024,
+  upper_limit,
   unit,
 }: {
   name: string;
   value: number;
-  upperLimit?: number;
+  upper_limit?: number;
   unit?: string;
 }) => {
   const { updateDevice } = useFirebase();
+  // Default to value if no upper_limit, ensuring slider accommodates current value
+  const maxVal = upper_limit || Math.max(1024, value);
 
   return (
     <div className="glass-card p-4 w-64">
@@ -52,13 +54,13 @@ const DimmerCard = ({
       <Slider
         value={[value]}
         min={0}
-        max={upperLimit}
+        max={maxVal}
         step={1}
         onValueChange={([v]) => updateDevice(name, v)}
       />
       <div className="mt-1 flex justify-between text-xs text-muted-foreground">
         <span>0</span>
-        <span>{upperLimit}</span>
+        <span>{maxVal}</span>
       </div>
     </div>
   );
@@ -100,14 +102,14 @@ const SensorCard = ({
   );
 };
 
-const DeviceCard = ({ name, type, value, upperLimit, unit }: DeviceCardProps) => {
+const DeviceCard = ({ name, type, value, upper_limit, unit }: DeviceCardProps) => {
   const { sensorHistory } = useFirebase();
 
   switch (type) {
     case "switch":
       return <SwitchCard name={name} value={value} />;
     case "dimmer":
-      return <DimmerCard name={name} value={value} upperLimit={upperLimit} unit={unit} />;
+      return <DimmerCard name={name} value={value} upper_limit={upper_limit} unit={unit} />;
     case "sensor":
       return (
         <SensorCard
