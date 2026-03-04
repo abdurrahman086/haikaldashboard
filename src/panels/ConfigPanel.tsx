@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TerminalLog from "@/components/TerminalLog";
 import { Settings } from "lucide-react";
-import { ref, set, getDatabase } from "firebase/database";
+import { ref, set, update, getDatabase } from "firebase/database";
 import { getApps } from "firebase/app";
 
 const ConfigPanel = () => {
-  const { config, setConfig, disconnect, isConfigured, addLog } = useFirebase();
+  const { config, setConfig, disconnect, isConfigured, addLog, devices } = useFirebase();
 
   const [apiKey, setApiKey] = useState(config?.apiKey || "");
   const [dbUrl, setDbUrl] = useState(config?.databaseURL || "");
@@ -59,38 +59,41 @@ const ConfigPanel = () => {
 
   const pushSimData = () => {
     if (!isConfigured || !config) return;
+    const deviceKeys = Object.keys(devices);
+    if (deviceKeys.length === 0) {
+      addLog("Simulation error: tidak ada device di Firebase untuk disimulasikan");
+      return;
+    }
     try {
       const apps = getApps();
       const app = apps.find(a => a.name.startsWith("iot-app-"));
       if (!app) { addLog("Error: Firebase not initialized"); return; }
       const db = getDatabase(app);
       const basePath = config.path;
+      const min = parseFloat(simMin) || 0;
+      const max = parseFloat(simMax) || 100;
 
-      const dummyData: Record<string, any> = {
-        room_lamp: { type: "switch", value: Math.round(Math.random()) },
-        room_fan: { type: "switch", value: Math.round(Math.random()) },
-        humidity: {
-          type: "sensor",
-          value: Math.round(Math.random() * (parseInt(simMax) - parseInt(simMin)) + parseInt(simMin)),
-          upper_limit: parseInt(simMax),
-          unit: "%",
-        },
-        temperature: {
-          type: "sensor",
-          value: +(Math.random() * 40 + 10).toFixed(1),
-          upper_limit: 100,
-          unit: "°C",
-        },
-        fan_speed: {
-          type: "dimmer",
-          value: Math.round(Math.random() * 1024),
-          upper_limit: 1024,
-          unit: "RPM",
-        },
-      };
+      // Only update values for devices that already exist in Firebase
+      const updates: Record<string, any> = {};
+      for (const [key, device] of Object.entries(devices)) {
+        switch (device.type) {
+          case "switch":
+            updates[`${key}/value`] = Math.round(Math.random());
+            break;
+          case "dimmer": {
+            const upperLimit = device.upper_limit || 1024;
+            updates[`${key}/value`] = Math.round(Math.random() * upperLimit);
+            break;
+          }
+          case "sensor": {
+            updates[`${key}/value`] = +(Math.random() * (max - min) + min).toFixed(1);
+            break;
+          }
+        }
+      }
 
-      set(ref(db, basePath), dummyData);
-      addLog("Simulation data pushed");
+      update(ref(db, basePath), updates);
+      addLog(`Simulation: ${deviceKeys.length} device(s) updated`);
     } catch (err: any) {
       addLog(`Simulation error: ${err.message}`);
     }
